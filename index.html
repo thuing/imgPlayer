@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>imgPlayer</title>
+        <link rel="stylesheet" href="layui/css/layui.css" media="all">
+    </head>
+
+    <body>
+        <div class="imgContent" style="width: 500px;height: 400px;margin: 10px">
+            <img id="image" style="width: 100%;height: 100%;" src="" >
+        </div>
+
+        <!--进度条-->
+        <div class="slide">
+            <div id="slide" class="slide-bg">
+                <div class="slide-bar"></div>
+            </div>
+            <div class="slide-btn"></div>
+            <button class="play">播放/暂停</button>
+            <button class="reset">重放</button>
+        </div>
+
+
+        <div class="controller">
+            开始时间: <input class="beginTime"><br>
+            结束时间: <input class="endTime">
+            <button class="selectTime">确定</button><br>
+
+        </div>
+    </body>
+    <style>
+        .slide{
+            position: relative;
+            margin: 10px;
+            width: 500px;
+        }
+        .slide-bg{
+            height: 5px;
+            overflow: hidden;
+            background-color:#f2f2f2;
+            border-radius: 5px;
+        }
+        .slide-bar{
+            width: 0;
+            height: 5px;
+            background-color: #01AAED;
+            position: relative;
+        }
+        .slide-btn{
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #01AAED;
+            top:-2px;
+            margin-left: -1px;
+            border-radius: 100px;
+            cursor: pointer;
+            left: 0px;
+        }
+        .point{
+            position: absolute;
+            top:-1px;
+            width: 8px;
+            height: 8px;
+            background-color: #01AAED;
+            cursor: pointer;
+        }
+        .test{
+            width:400px;
+            height:20px;
+            left:50%;
+            top:50%;
+            margin-top: 20px;
+        }
+        .controller{
+            margin-top: 10px;
+            margin-left: 100px;
+        }
+        .play{
+            margin-top: 5px;
+            align-items: center;
+        }
+        .reset{
+            margin-top: 5px;
+            align-items: center;
+        }
+        .point a{
+            display: none;
+            width: 100px;
+            position: relative;
+            top: 10PX;
+            left: -42px;
+            text-align: center;
+        }
+        .imgContent{
+            overflow: hidden;
+        }
+        [current=true]
+        {
+            background-color: #CDB591;
+        }
+    </style>
+    <script src="jquery-1.8.3.min.js"></script>
+    <script src="moment.min.js"></script>
+    <script src="layui/layui.js"></script>
+    <script>
+        $(function () {
+
+            // 初始化自变量
+            var source = [];
+
+            //读到图片
+            $.get("./data.json",function (res) {
+                var _source = res.data;
+                //layui 时间控件
+                layui.use(['laydate','slider'], function () {
+                    var laydate = layui.laydate;
+                    var slider = layui.slider;
+
+                    var beginTime = laydate.render({
+                        elem: ".beginTime" //指定元素
+                        , type: "datetime"
+                        , value: moment("2014-09-07 11:00").format("YYYY-MM-DD HH:mm")
+                        , format: 'yyyy-MM-dd HH:mm'
+                        , done: function (value, date, endDate) {
+                            date.month = date.month - 1;
+                            endTime.config.min = date;
+                        }
+                    });
+
+                    var endTime = laydate.render({
+                        elem: ".endTime" //指定元素
+                        , type: "datetime"
+                        , value: moment("2014-09-07 13:24").format("YYYY-MM-DD HH:mm")
+                        , format: 'yyyy-MM-dd HH:mm'
+                        , done: function (value, date, endDate) {
+                            date.month = date.month - 1;
+                            beginTime.config.max = date;
+                        }
+                    });
+                    //filter 依据时间过滤图片
+                    //filter($(".beginTime").val(),$(".endTime").val());
+
+                    $(".selectTime").click(function () {
+                        //筛选时间
+                        filter($(".beginTime").val(),$(".endTime").val());
+                    });
+
+                    //时间轴 点击事件
+                    $("body").on("click",".slide-bar span",function () {
+                        $(".slide-bar span").attr("current","false");
+                        $(this).attr("current","true");
+                        $(".imgContent img").attr("src",$(this).attr("_src"));
+                    })
+                    var timer = null;
+                    //control
+                    var i = 0;
+                    // 播放暂停
+                    $(".play").click(function () {
+                        if(timer == null){
+                            timer = setInterval(changeBar,1000)
+                            console.log(timer)
+                        }else{
+                            clearInterval(timer);
+                            timer = null;
+                        }
+                    })
+
+                    // 重播
+                    $(".reset").click(function () {
+                        i = 0 ;
+                        clearInterval(timer)
+                        timer = null;
+                        timer = setInterval(changeBar, 1000)
+                    })
+
+
+                    function changeBar() {
+                        if(i < source.length){
+                            var left = 100 / (source.length-1) * i ;
+
+                            var leftShift = left * 5;
+                            console.log("leftshift is :" + leftShift);
+                            $('.slide-bar').css('width',leftShift);
+                            $('.slide-btn').css('left', leftShift);
+                            $("#image").attr('src',source[i].url);
+                            i++;
+                            console.log("time is " + timer);
+                        }
+                    }
+
+                    //播放
+                    function loop() {
+                        if(!$(".slide-bar span[current='true']").length){
+                            $(".slide-bar span").eq(0).trigger("click");
+                        }else{
+                            $(".slide-bar span[current='true']").attr("current","false").next().trigger("click");
+                        }
+
+                    }
+
+                    //过滤
+                    function filter(begin,end){
+                        $(".slide-bar").html("");
+                        var _begin = moment(begin).format("YYYYMMDDHHmm");
+                        var _end = moment(end).format("YYYYMMDDHHmm");
+                        for(var i = 0 ; i < _source.length; i++){
+                            if(Number(_begin) <= Number(_source[i].time) && Number(_source[i].time) <= Number(_end)){
+                                source.push(_source[i]);
+                            }
+                        }
+                        // var _html = "";
+                        // for(var i = 0; i < source.length; i++){
+                        //     var left = 100 / (source.length-1) * i + "%"
+                        //
+                        //     _html += "<span style='left:"+ left +"' _src='"+ source[i].url +"' class='point'><a>"+ source[i].time +"</a></span>";
+                        //
+                        // }
+                        // $(".slide-bar").html(_html);
+                        // $(".point").hover(function () {
+                        //     $(this).find("a").css("display","block").show();
+                        // },function () {
+                        //     $(this).find("a").hide();
+                        // })
+                        console.log("筛选出的source是：" + source);
+                    }
+
+                });
+            });
+
+            // 鼠标拖拽移动
+            // var tag = false,ox = 0,left = 0,bgleft = 0;
+            // // 拖拽点按下
+            // $('.slide-btn').mousedown(function(e) {
+            //     ox = e.pageX - left;
+            //     console.log("ox is : " + ox );
+            //     tag = true;
+            // });
+            //
+            // // 抬起
+            // $(document).mouseup(function() {
+            //     tag = false;
+            // });
+            //
+            // // 按住拖动
+            // $('.slide').mousemove(function(e) {//鼠标移动
+            //     if (tag) {
+            //         left = e.pageX - ox;
+            //         if (left <= 0) {
+            //             left = 0;
+            //         }else if (left > 500) {
+            //             left = 500;
+            //         }
+            //         $('.slide-btn').css('left', left);
+            //         $('.slide-bar').width(left);
+            //     }
+            // });
+            //
+            // $('.slide-bg').click(function(e) {//鼠标点击
+            //     if (!tag) {
+            //         bgleft = $('.slide-bg').offset().left;
+            //         left = e.pageX - bgleft;
+            //         if (left <= 0) {
+            //             left = 0;
+            //         }else if (left > 500) {
+            //             left = 500;
+            //         }
+            //         $('.slide-btn').css('left', left);
+            //         $('.slide-bar').animate({width:left},500);
+            //     }
+            // });
+        })
+    </script>
+</html>
